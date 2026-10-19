@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="精算">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>ふたりの精算</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=DM+Mono:wght@500&display=swap">
+<style>
+/* Layout: one-column pocket tool — running balance on top, register entry, then the log */
+:root{
+  --bg:#f3f1f6; --card:#ffffff; --ink:#26223a; --muted:#7b7590; --line:#e2dee9;
+  --them:#d9577a; --them-soft:#fbe6ec; --me:#2f6fb7; --me-soft:#e2edf9; --ok:#2e8a5c; --ok-soft:#e1f3ea;
+  --font:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans",sans-serif;
+  --num:"DM Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#17151f; --card:#221f2d; --ink:#efecf6; --muted:#a29cb6; --line:#363246;
+  --them:#f07a99; --them-soft:#3d2531; --me:#6ea6ea; --me-soft:#1f2c40; --ok:#5cc28f; --ok-soft:#1d3428; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#17151f; --card:#221f2d; --ink:#efecf6; --muted:#a29cb6; --line:#363246;
+  --them:#f07a99; --them-soft:#3d2531; --me:#6ea6ea; --me-soft:#1f2c40; --ok:#5cc28f; --ok-soft:#1d3428; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:16px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 40px}
+.wrap{max-width:440px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+.wrap>*{min-width:0}
+h1{font-size:20px;font-weight:900;margin:0}
+h2{font-size:14px;font-weight:900;margin:0}
+.yen{font-family:var(--num);font-variant-numeric:tabular-nums}
+.card{background:var(--card);border-radius:18px;padding:16px;display:grid;grid-template-columns:minmax(0,1fr);gap:12px;box-shadow:0 1px 0 var(--line),0 6px 20px rgba(40,30,70,.05)}
+
+.balance{padding:20px}
+.balance .lbl{font-size:14px;font-weight:700;color:var(--muted)}
+.balance .big{font-size:44px;line-height:1.1}
+.balance .big small{font-size:18px;margin-left:2px}
+.balance .sub{font-size:14px;font-weight:700;text-wrap:balance}
+.balance.owe .big,.balance.owe .sub{color:var(--me)}
+.balance.over .big,.balance.over .sub{color:var(--them)}
+.balance.zero .big,.balance.zero .sub{color:var(--ok)}
+
+.amount{display:flex;align-items:center;background:var(--bg);border:2px solid var(--line);border-radius:14px;padding:4px 14px}
+.amount:focus-within{border-color:var(--ink)}
+.amount span{font-size:20px;color:var(--muted)}
+.amount input::placeholder{color:var(--muted);opacity:.5}
+.amount input{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font-family:var(--num);font-size:28px;padding:8px 6px;outline:none;text-align:right}
+.memo{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font:inherit;font-size:15px;color:var(--ink);width:100%}
+button{font:inherit;cursor:pointer;border:0;border-radius:14px}
+button:focus-visible,input:focus-visible{outline:3px solid var(--me);outline-offset:2px}
+.primary{padding:15px;font-size:16px;font-weight:900;color:#fff;width:100%}
+.primary.me{background:var(--me)} .primary.them{background:var(--them)} .primary.ok{background:var(--ok)}
+.primary:active{transform:scale(.98)}
+.preview{border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.6;background:var(--me-soft)}
+.preview b{font-family:var(--num);font-weight:500}
+.preview.split{background:var(--them-soft)}
+.note{font-size:12px;color:var(--muted);margin:0}
+.err{font-size:13px;color:var(--them);margin:0;font-weight:700}
+details.card{display:block}
+details.card .body{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-top:12px}
+details.card summary{cursor:pointer;font-size:14px;font-weight:900;list-style:none;display:flex;justify-content:space-between}
+details.card summary::-webkit-details-marker{display:none}
+details.card summary::after{content:"＋";color:var(--muted);font-size:20px;align-self:center}
+details[open].card summary::after{content:"－"}
+
+.log{padding:6px 14px}
+.log h2{color:var(--muted);font-size:13px;margin:10px 0 4px;display:flex;justify-content:space-between}
+.row{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.row:first-of-type{border-top:0}
+.tag{font-size:11px;font-weight:900;padding:3px 8px;border-radius:999px;white-space:nowrap}
+.tag.lend{background:var(--them-soft);color:var(--them)} .tag.pay{background:var(--me-soft);color:var(--me)} .tag.settle{background:var(--ok-soft);color:var(--ok)}
+.row .m{font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+.row .a{font-size:15px}
+.del{background:transparent;color:var(--muted);font-size:18px;padding:4px 8px}
+.empty{color:var(--muted);font-size:14px;padding:14px 0;text-align:center}
+.sample{font-size:11px;font-weight:500}
+.foot{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.ghost{background:transparent;border:1px solid var(--line);color:var(--muted);padding:10px 14px;font-size:14px}
+.danger{background:var(--them);color:#fff;padding:10px 14px;font-size:14px;font-weight:700}
+.confirm{display:flex;gap:8px;align-items:center;font-size:13px}
+.names{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.names label{font-size:12px;color:var(--muted);display:grid;gap:4px}
+.names input{font:inherit;font-size:15px;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);width:100%}
+.undo{justify-self:start;background:var(--bg);color:var(--ink);border:1px solid var(--line);padding:8px 12px;font-size:13px;font-weight:700;border-radius:999px}
+.btn2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.primary.me-soft{background:var(--me-soft);color:var(--me)} .primary.them-soft{background:var(--them-soft);color:var(--them)}
+.btn2 .primary{font-size:15px;padding:14px 6px}
+.preview .row2{display:block}
+@media (prefers-reduced-motion:reduce){.primary:active{transform:none}}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <h1>ふたりの精算</h1>
+  <p class="err" id="noStore" hidden>この開き方では記録が保存されません。プライベートブラウズでないか確認してください。</p>
+
+  <section class="card balance" id="balance" aria-live="polite">
+    <div class="lbl" id="balLbl"></div>
+    <div class="big yen" id="balNum"></div>
+    <div class="sub" id="balSub"></div>
+    <button class="undo" id="undoBtn" hidden></button>
+  </section>
+
+  <section class="card">
+    <div><h2 id="payTitle">相手が払った</h2><p class="note" id="paySub">自分の分を払ってくれたとき → 残りから差し引き</p></div>
+    <div class="amount"><span>¥</span><input id="payAmt" type="text" inputmode="numeric" placeholder="0" autocomplete="off" aria-label="金額"></div>
+    <div class="preview" id="payPreview" hidden></div>
+    <input id="payMemo" class="memo" type="text" placeholder="メモ（例：ランチ、コンビニ）" aria-label="メモ" autocomplete="off">
+    <div class="btn2"><button class="primary me" id="payBtn">全額</button><button class="primary me-soft" id="halfBtn">シェア（半分）</button></div>
+    <p class="err" id="payErr" hidden>金額を入れてから押してください。</p>
+  </section>
+
+  <details class="card" id="lendBox" open>
+    <summary><div><h2 id="lendTitle">自分が立て替えた</h2><p class="note" id="lendSub">相手の分を払ったとき → 残りに追加</p></div></summary>
+    <div class="body">
+    <div class="amount"><span>¥</span><input id="lendAmt" type="text" inputmode="numeric" placeholder="0" autocomplete="off" aria-label="立て替えた金額"></div>
+    <div class="preview split" id="lendPreview" hidden></div>
+    <input id="lendMemo" class="memo" type="text" placeholder="メモ（例：ホテル代）" aria-label="メモ" autocomplete="off">
+    <div class="btn2"><button class="primary them" id="lendBtn">全額</button><button class="primary them-soft" id="lendHalfBtn">シェア（半分）</button></div>
+    <p class="err" id="lendErr" hidden>金額を入れてから押してください。</p>
+    </div>
+  </details>
+
+  <div id="settleArea"></div>
+
+  <section class="card log">
+    <h2><span>記録</span><span class="sample" id="sampleNote" hidden>※例のデータです。何か入れると消えます</span></h2>
+    <div id="rows"></div>
+  </section>
+
+  <div class="foot">
+    <button class="ghost" id="nameBtn">相手の名前を入れる</button>
+    <div id="resetArea"></div>
+  </div>
+  <div class="names" id="names" hidden>
+    <label>相手の名前<input id="themName" type="text" maxlength="8"></label>
+    <label>自分の名前<input id="meName" type="text" maxlength="8"></label>
+  </div>
+  <p class="note">iPhoneならSafariの共有ボタン →「ホーム画面に追加」でアプリのように使えます。記録はこの端末のブラウザに残ります。</p>
+</div>
+
+<script>
+const KEY='futari-seisan-v2';
+const load=()=>{try{return JSON.parse(localStorage.getItem(KEY))}catch(e){return null}};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}};
+setTimeout(()=>{let ok=false;try{localStorage.setItem(KEY+'-t','1');ok=localStorage.getItem(KEY+'-t')==='1';localStorage.removeItem(KEY+'-t');}catch(e){}document.getElementById('noStore').hidden=ok;},0);
+let state=load()||{sample:true,them:'相手',me:'自分',items:[
+  {type:'lend',paid:6000,owe:6000,memo:'ホテル代'},
+  {type:'pay',amt:900,memo:'ランチ'}]};
+const $=id=>document.getElementById(id);
+const n=v=>Math.round(v).toLocaleString('ja-JP');
+const num=el=>parseInt((el.value||'').replace(/[^0-9]/g,''),10)||0;
+// 正: 自分が相手に借りている額
+const balance=()=>state.items.reduce((s,i)=>s+(i.type==='lend'?i.owe:-(i.amt)),0);
+
+function renderBalance(){
+  const b=balance(), box=$('balance');
+  if(b>0){box.className='card balance owe';$('balLbl').textContent=`${state.them}から返してもらう残り`;
+    $('balNum').innerHTML=n(b)+'<small>円</small>';$('balSub').textContent=`次の会計で${state.them}が${state.me}の分を払うと、ここから減ります`;}
+  else if(b<0){box.className='card balance over';$('balLbl').textContent=`${state.them}の払いすぎ`;
+    $('balNum').innerHTML=n(-b)+'<small>円</small>';$('balSub').textContent=`${state.them}に${n(-b)}円返すとトントン`;}
+  else{box.className='card balance zero';$('balLbl').textContent='精算';
+    $('balNum').innerHTML='0<small>円</small>';$('balSub').textContent='貸し借りなし';}
+}
+function verdict(a,b){
+  if(b<=0)return `もう返してもらう分はないので、${n(a)}円は${state.them}への借りに`;
+  if(a<=b)return `全部払ってもらってOK（残り <b>${n(b-a)}</b>円）`;
+  return `払ってもらうのは <b>${n(b)}</b>円まで。超えた <b>${n(a-b)}</b>円は${state.me}が払う`;
+}
+function renderPreview(){
+  // 残りを超えるときだけ、短く知らせる
+  const a=num($('payAmt')), b=balance(), p=$('payPreview');
+  const over=b>0&&a>b;
+  p.hidden=!over;
+  if(over){p.className='preview split';p.innerHTML=`全額だと残り<b>${n(b)}</b>円を<b>${n(a-b)}</b>円超えます`;}
+}
+function renderLendNote(){}
+function render(){
+  $('payTitle').textContent=`${state.them}が払った`;$('paySub').textContent=`${state.me}の分を払ってくれたとき → 残りから差し引き`;
+  $('lendTitle').textContent=`${state.me}が立て替えた`;$('lendSub').textContent=`${state.them}の分を払ったとき → 残りに追加`;
+  renderBalance();
+  const last=state.items[state.items.length-1], ub=$('undoBtn');
+  ub.hidden=!last||state.sample;
+  if(last&&!state.sample){
+    const what=last.type==='lend'?`立替 +${n(last.owe)}円`:last.type==='settle'?`送金 ${n(last.amt)}円`:`${n(last.amt)}円の差し引き`;
+    ub.textContent=`↩ 1つ戻す（${what}）`;
+    ub.onclick=()=>{state.items.pop();save();render();};
+  }renderPreview();renderLendNote();
+  const b=balance();
+  $('settleArea').innerHTML='';
+  if(b>0&&!state.sample){
+    const btn=document.createElement('button');btn.className='primary ok';
+    btn.textContent=`残り${n(b)}円を送金してもらった`;
+    btn.onclick=()=>{state.items.push({type:'settle',amt:b,memo:'QR送金'});save();render();};
+    $('settleArea').appendChild(btn);
+  }
+  $('sampleNote').hidden=!state.sample;
+  const rows=$('rows');rows.innerHTML='';
+  if(!state.items.length)rows.innerHTML='<div class="empty">まだ記録がありません</div>';
+  state.items.forEach((it,i)=>{
+    const r=document.createElement('div');r.className='row';
+    const tag={lend:`${state.me}立替`,pay:`${state.them}払い`,settle:'送金'}[it.type];
+    const amt=it.type==='lend'?`+${n(it.owe)}`:`−${n(it.amt)}`;
+    const memo=(it.memo||'')+(it.type==='lend'&&it.paid!==it.owe?`${it.memo?' ':''}シェア（${n(it.paid)}円の半分）`:'');
+    r.innerHTML=`<span class="tag ${it.type}"></span><span class="m"></span><span class="a yen"></span><button class="del" aria-label="削除">×</button>`;
+    r.querySelector('.tag').textContent=tag;r.querySelector('.m').textContent=memo;r.querySelector('.a').textContent=amt;
+    r.querySelector('.del').onclick=()=>{state.items.splice(i,1);save();render();};
+    rows.prepend(r);
+  });
+}
+function clearSample(){if(state.sample){state.items=[];state.sample=false;}}
+function fmtInput(e){const d=e.target.value.replace(/[^0-9]/g,'');e.target.value=d?(+d).toLocaleString('ja-JP'):'';}
+$('payAmt').addEventListener('input',e=>{fmtInput(e);renderPreview();});
+
+$('lendAmt').addEventListener('input',e=>{fmtInput(e);renderLendNote();});
+function commitPay(half){
+  const raw=num($('payAmt'));if(!raw){$('payErr').hidden=false;return;}
+  $('payErr').hidden=true;clearSample();
+  const memo=$('payMemo').value.trim();
+  state.items.push(half?{type:'pay',amt:Math.round(raw/2),memo:(memo?memo+' ':'')+`シェア（${n(raw)}円の半分）`}:{type:'pay',amt:raw,memo});
+  $('payAmt').value='';$('payMemo').value='';save();render();
+}
+$('payBtn').onclick=()=>commitPay(false);$('halfBtn').onclick=()=>commitPay(true);
+function commitLend(half){
+  const a=num($('lendAmt'));if(!a){$('lendErr').hidden=false;return;}
+  $('lendErr').hidden=true;clearSample();
+  state.items.push({type:'lend',paid:a,owe:half?Math.round(a/2):a,memo:$('lendMemo').value.trim()});
+  $('lendAmt').value='';$('lendMemo').value='';save();render();
+}
+$('lendBtn').onclick=()=>commitLend(false);$('lendHalfBtn').onclick=()=>commitLend(true);
+$('nameBtn').onclick=()=>{$('names').hidden=!$('names').hidden;$('themName').value=state.them;$('meName').value=state.me;};
+$('themName').oninput=e=>{state.them=e.target.value.trim()||'相手';save();render();};
+$('meName').oninput=e=>{state.me=e.target.value.trim()||'自分';save();render();};
+function resetIdle(){$('resetArea').innerHTML='<button class="ghost" id="resetBtn">全部リセット</button>';$('resetBtn').onclick=askReset;}
+function askReset(){
+  $('resetArea').innerHTML='<span class="confirm">全部消しますか？ <button class="danger" id="yes">消す</button><button class="ghost" id="no">やめる</button></span>';
+  $('yes').onclick=()=>{state.items=[];state.sample=false;save();render();resetIdle();};
+  $('no').onclick=resetIdle;
+}
+try{if(localStorage.getItem(KEY+'-lend')==='0')$('lendBox').open=false;}catch(e){}
+$('lendBox').addEventListener('toggle',()=>{try{localStorage.setItem(KEY+'-lend',$('lendBox').open?'1':'0')}catch(e){}});
+resetIdle();render();
+</script>
+
+</body>
+</html>
