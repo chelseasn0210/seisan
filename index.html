@@ -45,7 +45,16 @@ h2{font-size:14px;font-weight:900;margin:0}
 .balance.zero .big,.balance.zero .sub{color:var(--ok)}
 
 .amount{display:flex;align-items:center;background:var(--bg);border:2px solid var(--line);border-radius:14px;padding:4px 14px}
-.amount:focus-within{border-color:var(--ink)}
+.amount:focus-within{border-color:var(--me)}
+.amount input:focus-visible,.memo:focus-visible{outline:none}
+.memo:focus{border-color:var(--me)}
+.minibar{position:fixed;left:0;right:0;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line);box-shadow:0 4px 14px rgba(40,30,70,.08);
+  padding-top:calc(env(safe-area-inset-top,0px) + 8px);padding-bottom:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;justify-content:center;align-items:baseline;gap:10px;font-weight:700;font-size:14px;color:var(--muted);transform:translateY(-110%);transition:transform .2s}
+.minibar.show{transform:none}
+.minibar .yen{font-size:22px;color:var(--me)}
+.minibar.over .yen{color:var(--them)} .minibar.zero .yen{color:var(--ok)}
+@media (prefers-reduced-motion:reduce){.minibar{transition:none}}
 .amount span{font-size:20px;color:var(--muted)}
 .amount input::placeholder{color:var(--muted);opacity:.5}
 .amount input{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font-family:var(--num);font-size:28px;padding:8px 6px;outline:none;text-align:right}
@@ -100,6 +109,7 @@ details[open].card summary::after{content:"－"}
   <h1>ふたりの精算</h1>
   <p class="err" id="noStore" hidden>この開き方では記録が保存されません。プライベートブラウズでないか確認してください。</p>
 
+  <div class="minibar" id="minibar" aria-hidden="true"><span id="miniLbl"></span><span class="yen" id="miniNum"></span></div>
   <section class="card balance" id="balance" aria-live="polite">
     <div class="lbl" id="balLbl"></div>
     <div class="big yen" id="balNum"></div>
@@ -159,7 +169,14 @@ const num=el=>parseInt((el.value||'').replace(/[^0-9]/g,''),10)||0;
 // 正: 自分が相手に借りている額
 const balance=()=>state.items.reduce((s,i)=>s+(i.type==='lend'?i.owe:-(i.amt)),0);
 
+function renderMini(){
+  const b=balance(), m=$('minibar');
+  m.classList.toggle('over',b<0);m.classList.toggle('zero',b===0);
+  $('miniLbl').textContent=b>0?'返してもらう残り':b<0?`${state.them}の払いすぎ`:'精算済み';
+  $('miniNum').textContent=n(Math.abs(b))+'円';
+}
 function renderBalance(){
+  renderMini();
   const b=balance(), box=$('balance');
   if(b>0){box.className='card balance owe';$('balLbl').textContent=`${state.them}から返してもらう残り`;
     $('balNum').innerHTML=n(b)+'<small>円</small>';$('balSub').textContent=`次の会計で${state.them}が${state.me}の分を払うと、ここから減ります`;}
@@ -245,6 +262,7 @@ function askReset(){
 }
 try{if(localStorage.getItem(KEY+'-lend')==='0')$('lendBox').open=false;}catch(e){}
 $('lendBox').addEventListener('toggle',()=>{try{localStorage.setItem(KEY+'-lend',$('lendBox').open?'1':'0')}catch(e){}});
+try{new IntersectionObserver(es=>{$('minibar').classList.toggle('show',!es[0].isIntersecting);},{threshold:0.15}).observe($('balNum'));}catch(e){}
 resetIdle();render();
 </script>
 
